@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,27 @@ public sealed class ParkingServiceTests : IDisposable
         Assert.Equal(1, await db.AnalysisRuns.CountAsync()); Assert.Equal(24, await db.OccupancyResults.CountAsync());
         Assert.All(await db.OccupancyResults.ToListAsync(), x => Assert.Equal(result.Id, x.AnalysisRunId));
         Assert.Equal(result.Id, (await Service().GetAnalysisAsync(ParkingDbContext.DemoLotId, result.Id, default)).Id);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(7)]
+    [InlineData(9)]
+    public async Task CreatedTimestampUsesPostgresPrecisionAndRoundTripsExactly(int extraTicks)
+    {
+        var expected = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero).AddTicks(1234560);
+        var service = new ParkingService(db, new FakeAnalyzer(), new FixedClock(expected.AddTicks(extraTicks)));
+        var created = await service.AnalyzeAsync(ParkingDbContext.DemoLotId, Image(), default);
+        var persisted = await service.GetAnalysisAsync(ParkingDbContext.DemoLotId, created.Id, default);
+
+        Assert.Equal(expected, created.CreatedAt);
+        Assert.Equal(JsonSerializer.Serialize(created), JsonSerializer.Serialize(persisted));
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     [Theory]

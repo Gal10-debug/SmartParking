@@ -48,11 +48,14 @@ public sealed class ParkingService(ParkingDbContext db, IAiAnalyzer analyzer, Ti
             result.Spaces.Any(x => !double.IsFinite(x.Confidence) || x.Confidence is < 0 or > 1))
             throw new ApiException(502, "The analysis service returned inconsistent parking-space results.");
         var imageName = Path.GetFileName(image.FileName.Replace('\\', '/'));
+        // PostgreSQL retains microseconds, so POST and subsequent GET must use that precision.
+        var createdAt = clock.GetUtcNow();
+        createdAt = createdAt.AddTicks(-(createdAt.Ticks % TimeSpan.TicksPerMicrosecond));
         var run = new AnalysisRun
         {
             Id = Guid.NewGuid(),
             ParkingLotId = lot.Id,
-            CreatedAt = clock.GetUtcNow(),
+            CreatedAt = createdAt,
             ImageName = imageName[..Math.Min(imageName.Length, 255)],
             Analyzer = result.Analyzer,
             Results = result.Spaces.Select(x => new OccupancyResult { ParkingSpaceId = x.SpaceId, Occupied = x.Occupied, Confidence = x.Confidence }).ToList()

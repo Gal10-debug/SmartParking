@@ -52,7 +52,12 @@ def main():
         if location.startswith("http"):
             with urllib.request.urlopen(location) as response: persisted = json.load(response)
         else: _, persisted, _ = request(base, location)
-        assert persisted == run, "Created resource did not round-trip from database"
+        differences = {
+            key: {"created": run.get(key), "persisted": persisted.get(key)}
+            for key in run.keys() | persisted.keys()
+            if run.get(key) != persisted.get(key)
+        }
+        assert persisted == run, f"Created resource did not round-trip from database: {json.dumps(differences, sort_keys=True)}"
         runs.append(run)
     assert runs[0]["spaces"] == runs[1]["spaces"], "Analyzer is not deterministic"
     _, history, _ = request(base, path)
