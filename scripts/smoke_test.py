@@ -49,11 +49,11 @@ def main():
     for image, filename, mime in [(reference.read_bytes(), "bus.jpg", "image/jpeg"), (png(), "blank.png", "image/png")]:
         status, run, response_headers = upload(base, path, image, filename, mime)
         assert status == 201
-        assert run["mode"] == "vehicle-detection" and run["analyzer"] == "yolo11n-coco-v1"
+        assert run["mode"] == "vehicle-detection" and run["analyzer"] == "yolov8s-visdrone-cbcca22c-v1"
         assert run["vehicleCount"] == len(run["detections"])
         assert all(run[key] is None for key in ("totalSpaces", "occupiedSpaces", "availableSpaces", "occupancyPercentage"))
         if filename == "bus.jpg":
-            assert any(d["className"] == "bus" for d in run["detections"]), "Real model missed reference bus"
+            assert run["vehicleCount"] > 0, "Real aerial model missed reference vehicle"
         else:
             assert run["vehicleCount"] == 0, "Blank image has invented detections"
         for detection in run["detections"]:

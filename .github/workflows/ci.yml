@@ -34,8 +34,12 @@ jobs:
       - run: dotnet test server/SmartParking.Tests/SmartParking.Tests.csproj --no-build --configuration Release
   analyzer:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [aerial, coco]
     env:
-      YOLO_MODEL_PATH: .models/yolo11n.pt
+      YOLO_MODEL_PROFILE: ${{ matrix.profile }}
+      YOLO_MODEL_PATH: .models/ci-model.pt
       YOLO_CONFIG_DIR: .ultralytics
       MPLCONFIGDIR: .ultralytics/matplotlib
       YOLO_DEVICE: cpu
@@ -51,7 +55,7 @@ jobs:
           cache-dependency-path: ai-service/requirements*.txt
       - run: python -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m scripts.download_model --output .models/yolo11n.pt
+      - run: python -m scripts.download_model --profile ${{ matrix.profile }} --output .models/ci-model.pt
       - run: python -m pytest
   integration:
     runs-on: ubuntu-latest
