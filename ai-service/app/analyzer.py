@@ -6,9 +6,8 @@ from threading import Lock
 from typing import Any, Protocol
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
-from app.model_weights import MODEL_SHA256
+from app.model_weights import get_profile
 
-VEHICLE_CLASSES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 MAX_DETECTIONS = 300
 
 
@@ -47,16 +46,17 @@ class VehicleAnalyzer(Protocol):
 class YoloVehicleAnalyzer:
     """A single CPU-capable model, loaded once and protected during inference."""
     def __init__(self, model_path: Path, confidence: float = 0.35,
-                 image_size: int = 960, device: str = "cpu", model: Any = None):
+                 image_size: int = 960, device: str = "cpu", model: Any = None, profile: str = "aerial"):
+        self.profile = get_profile(profile)
         if not 0 < confidence <= 1:
             raise ValueError("YOLO_CONFIDENCE must be greater than 0 and at most 1")
         if image_size < 320 or image_size > 1536 or image_size % 32:
             raise ValueError("YOLO_IMAGE_SIZE must be a multiple of 32 between 320 and 1536")
         if model is None:
             if not model_path.is_file():
-                raise RuntimeError("YOLO_MODEL_PATH must point to downloaded yolo11n.pt weights. Run the model download command in README.")
-            if sha256(model_path.read_bytes()).hexdigest() != MODEL_SHA256:
-                raise RuntimeError("Model checksum mismatch. Download the supported YOLO11n weights again.")
+                raise RuntimeError("YOLO_MODEL_PATH must point to downloaded supported model weights. Run the model download command in README.")
+            if sha256(model_path.read_bytes()).hexdigest() != self.profile.sha256:
+                raise RuntimeError("Model checksum mismatch. Download the selected profile weights again.")
             os.environ.setdefault("YOLO_OFFLINE", "true")
             os.environ.setdefault("YOLO_AUTOINSTALL", "false")
             from ultralytics import YOLO
@@ -73,17 +73,18 @@ class YoloVehicleAnalyzer:
         if not path:
             raise RuntimeError("Set YOLO_MODEL_PATH before starting the analyzer.")
         return cls(Path(path), float(os.getenv("YOLO_CONFIDENCE", "0.35")),
-                   int(os.getenv("YOLO_IMAGE_SIZE", "960")), os.getenv("YOLO_DEVICE", "cpu"))
+                   int(os.getenv("YOLO_IMAGE_SIZE", "960")), os.getenv("YOLO_DEVICE", "cpu"),
+                   profile=os.getenv("YOLO_MODEL_PROFILE", "aerial"))
 
     def analyze(self, image: Image.Image) -> AnalysisResult:
         with self.lock:
-            result = self.model.predict(source=image, classes=list(VEHICLE_CLASSES),
+            result = self.model.predict(source=image, classes=list(self.profile.classes),
                 conf=self.confidence, imgsz=self.image_size, device=self.device,
-                max_det=MAX_DETECTIONS, verbose=False, save=False)[0]
+                max_det=MAX_DETECTIONS, agnostic_nms=True, iou=0.5, verbose=False, save=False)[0]
             rows = result.boxes.data.cpu().tolist() if result.boxes is not None else []
         detections = []
         for x1, y1, x2, y2, score, class_id in rows:
-            label = VEHICLE_CLASSES.get(int(class_id))
+            label = self.profile.classes.get(int(class_id))
             if label is None or score < self.confidence:
                 continue
             # Clip boxes to the oriented image, then normalize for responsive overlays.
@@ -95,5 +96,5 @@ class YoloVehicleAnalyzer:
                 class_name=label, confidence=float(score), box=BoundingBox(
                     x=x1 / image.width, y=y1 / image.height,
                     width=(x2 - x1) / image.width, height=(y2 - y1) / image.height)))
-        return AnalysisResult(analyzer="yolo11n-coco-v1", image_width=image.width,
+        return AnalysisResult(analyzer=self.profile.identity, image_width=image.width,
                               image_height=image.height, detections=detections)

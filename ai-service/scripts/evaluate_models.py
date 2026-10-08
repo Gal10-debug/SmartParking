@@ -11,11 +11,8 @@ import urllib.request
 
 import certifi
 from PIL import Image, ImageDraw, ImageOps
-from app.model_weights import MODEL_SHA256
+from app.model_weights import MODEL_SHA256, AERIAL_REVISION, AERIAL_URL, AERIAL_SHA256
 
-AERIAL_REVISION = "cbcca22c6388563fee903e67794dd4ee7755f4a1"
-AERIAL_URL = f"https://huggingface.co/dronefreak/visdrone-yolov8s/resolve/{AERIAL_REVISION}/best.pt"
-AERIAL_SHA256 = "29dae68ac5028cedac1f396333ac89cd9c74232691155243d70d9a1c16cdb24e"
 VEHICLE_NAMES = {"car", "van", "truck", "bus", "motor", "motorcycle"}
 
 

@@ -97,7 +97,7 @@ class FakeModel:
 def test_yolo_adapter_filters_classes_and_scores_and_normalizes_boxes():
     model = FakeModel([[10, 20, 40, 60, 0.9, 2], [0, 0, 5, 5, 0.9, 0],
                        [0, 0, 5, 5, 0.1, 7], [-10, 80, 110, 120, 0.8, 5]])
-    data = YoloVehicleAnalyzer(Path("unused"), model=model).analyze(Image.new("RGB", (100, 100)))
+    data = YoloVehicleAnalyzer(Path("unused"), model=model, profile="coco").analyze(Image.new("RGB", (100, 100)))
     assert [d.class_name for d in data.detections] == ["car", "bus"]
     assert data.detections[0].box == BoundingBox(x=.1, y=.2, width=.3, height=.4)
     assert data.detections[1].box == BoundingBox(x=0, y=.8, width=1, height=.2)
@@ -107,6 +107,29 @@ def test_yolo_adapter_filters_classes_and_scores_and_normalizes_boxes():
 def test_no_vehicles_produces_empty_detections():
     data = YoloVehicleAnalyzer(Path("unused"), model=FakeModel([])).analyze(Image.new("RGB", (32, 24)))
     assert data.detections == []
+
+
+def test_aerial_profile_maps_vans_and_motors_and_suppresses_cross_class_duplicates():
+    model = FakeModel([[10, 20, 40, 60, 0.9, 3], [50, 20, 80, 60, 0.8, 4],
+                       [0, 0, 5, 5, 0.9, 9], [0, 0, 5, 5, 0.9, 0]])
+    data = YoloVehicleAnalyzer(Path("unused"), model=model, profile="aerial").analyze(Image.new("RGB", (100, 100)))
+    assert [d.class_name for d in data.detections] == ["car", "car", "motorcycle"]
+    assert data.analyzer == "yolov8s-visdrone-cbcca22c-v1"
+    assert model.options["classes"] == [3, 4, 5, 8, 9]
+    assert model.options["agnostic_nms"] is True and model.options["iou"] == .5
+
+
+def test_unknown_profile_and_weights_for_wrong_profile_fail(monkeypatch):
+    with pytest.raises(ValueError, match="YOLO_MODEL_PROFILE"):
+        YoloVehicleAnalyzer(Path("unused"), model=FakeModel([]), profile="unknown")
+    monkeypatch.setenv("YOLO_MODEL_PROFILE", "unknown")
+    monkeypatch.setenv("YOLO_MODEL_PATH", "unused")
+    with pytest.raises(ValueError, match="YOLO_MODEL_PROFILE"):
+        YoloVehicleAnalyzer.from_environment()
+    coco = Path(".models/yolo11n.pt")
+    if coco.is_file():
+        with pytest.raises(RuntimeError, match="checksum"):
+            YoloVehicleAnalyzer(coco, profile="aerial")
 
 
 def test_missing_weights_and_bad_settings_fail_clearly(tmp_path):
@@ -127,6 +150,9 @@ def test_real_model_detects_fixture_and_no_vehicles_in_blank_image():
     detector = YoloVehicleAnalyzer.from_environment()
     with Image.open(Path(__file__).parent / "fixtures" / "bus.jpg") as image:
         data = detector.analyze(image.convert("RGB"))
-    assert any(d.class_name == "bus" for d in data.detections)
+    assert data.detections, "Real checkpoint failed to detect any vehicle in the fixture"
+    if detector.profile.identity == "yolo11n-coco-v1":
+        assert any(d.class_name == "bus" for d in data.detections)
+    assert data.analyzer == detector.profile.identity
     assert all(d.class_name in {"car", "bus", "truck", "motorcycle"} for d in data.detections)
     assert detector.analyze(Image.new("RGB", (640, 480), "white")).detections == []
