@@ -1,61 +1,66 @@
 # SmartParking
 
-A working parking occupancy dashboard with image uploads, persisted analysis history, and a separate image-analysis service. This portfolio MVP implements the complete application flow; the detector is deliberately simulated so real computer vision can be introduced independently.
+A full-stack vehicle-detection dashboard. Upload a parking-lot or street image to detect visible **cars, motorcycles, buses and trucks**, inspect bounding boxes and confidence scores, and revisit saved images in analysis history.
 
-**Current detector: deterministic demo, not vehicle detection.** It decodes an image and hashes its pixels to assign occupancy to configured spaces. The same pixels and space IDs produce the same result. Confidence is fixed at 0.5 and is not a model probability. The UI labels this explicitly.
+The Python service now runs a real, pretrained **YOLO11n COCO model on CPU**. There is no simulated detector or fallback for new analyses. Model failures are reported as errors.
+
+**Vehicle detection is not parking-space detection.** Capacity, occupied spaces, available spaces and occupancy percentage remain unknown. Detected vehicles can include moving traffic, and the model can miss or misclassify vehicles. A zero result means no detections above the threshold, not that a parking lot is empty.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     Browser[React / TypeScript dashboard] -->|REST + multipart image| API[ASP.NET Core API]
-    API -->|HTTP image + configured space IDs| AI[Python / FastAPI]
-    AI --> Analyzer[ParkingAnalyzer interface]
-    Analyzer --> Demo[Deterministic demo analyzer]
+    API -->|HTTP image| AI[Python / FastAPI]
+    AI --> Interface[VehicleAnalyzer interface]
+    Interface --> YOLO[YOLO11n / CPU inference]
     API -->|EF Core| DB[(PostgreSQL)]
-    API -->|Saved snapshot + history| Browser
+    API -->|Saved results + image endpoint| Browser
 ```
 
-The browser only calls the application API. Python has no database access. The .NET service validates the analyzer's result, then saves the run and all occupancy rows in one EF Core transaction. Failed analysis does not create history entries. Uploaded images are processed in memory and are **not retained**; only their sanitized filenames and occupancy results are stored.
+The frontend calls only .NET. Python decodes and orients the image, filters the four supported vehicle classes, and returns confidence scores and normalized bounding boxes. The API validates the result and atomically saves the run, detection rows and uploaded image. Failed analysis creates no history entry.
 
-- **Client:** React 19, TypeScript, Vite; responsive dashboard, preview/drop upload, loading/error states, schematic occupancy map, paginated history.
-- **API:** .NET 10, ASP.NET Core controllers, DI services, typed DTOs, centralized problem responses, EF Core, Npgsql, Swagger.
-- **Analyzer:** Python 3.12+, FastAPI, Pillow, isolated `ParkingAnalyzer` protocol; image decoding runs off the event loop.
-- **Data:** PostgreSQL; migration seeds one lot with 24 spaces (A01–A12 and B01–B12).
-- **Infrastructure:** Docker Compose, nginx same-origin proxy, GitHub Actions CI.
+Images are stored in a separate PostgreSQL table so history queries do not load image bytes. The image endpoint serves them on demand. Normalized boxes scale with the displayed image, including images with EXIF orientation.
+
+- **Client:** React 19, TypeScript, Vite; image previews, upload validation, loading/errors, detection boxes, class counts and paginated history.
+- **API:** .NET 10, controllers, DI, typed DTOs, centralized problem responses, EF Core/Npgsql, Swagger.
+- **Analyzer:** Python 3.12+, FastAPI, Pillow, Ultralytics and PyTorch; one warmed model, serialized inference access, image decoding off the event loop.
+- **Database:** PostgreSQL; lots, runs, detections and archived images. Previous demo-space and occupancy data is preserved for migration compatibility.
+- **Infrastructure:** Docker Compose, nginx proxy and GitHub Actions CI. No automatic deployment or repository bots.
 
 ```text
-client/                     React application and nginx configuration
-server/SmartParking.Api/    Controllers, services, DTOs, EF models and migrations
-server/SmartParking.Tests/  Service, HTTP API and upstream-client tests
-ai-service/app/             FastAPI endpoint and replaceable analyzer
-ai-service/tests/           Image validation and analyzer tests
-scripts/smoke_test.py        Real HTTP upload and persistence verification
-.github/workflows/ci.yml     Builds, tests and disposable Compose integration check
+client/                     Dashboard, bounding-box viewer and API client
+server/SmartParking.Api/    Controllers, services, DTOs, models and migrations
+server/SmartParking.Tests/  Persistence, validation and HTTP API tests
+ai-service/app/             Replaceable vehicle analyzer and FastAPI routes
+ai-service/scripts/         Verified model download
+ai-service/tests/           Validation, adapter and real-model tests
+scripts/smoke_test.py        Real inference, image and database round-trip checks
+.github/workflows/ci.yml     Service builds/tests and Compose integration check
 ```
 
 ## Run with Docker Compose
 
-Prerequisite: Docker Engine/Desktop with Compose v2.
+Install Docker Engine/Desktop with Compose v2, then:
 
 ```sh
 cp .env.example .env
-# Edit .env: replace POSTGRES_PASSWORD with your own local alphanumeric password.
+# Edit .env and choose your own local alphanumeric POSTGRES_PASSWORD.
 docker compose config --quiet
 docker compose up --build -d
 ```
 
-Default local addresses (host ports can be changed in `.env`):
+Open **http://localhost:3000**. The first build downloads Python/PyTorch dependencies and the 5.6 MB model. The analyzer image installs CPU-only PyTorch wheels and OpenCV runtime libraries. Model weights are downloaded and checksum-verified at build time; runtime inference operates offline. The health check waits for model loading and warm-up before the API starts.
 
-| Service | Address |
+| Service | Default local address |
 | --- | --- |
 | Dashboard | http://localhost:3000 |
 | API / Swagger | http://localhost:8080/swagger |
 | API database health | http://localhost:8080/health |
-| Analyzer docs | http://localhost:8000/docs |
+| Analyzer readiness / docs | http://localhost:8000/health / http://localhost:8000/docs |
 | PostgreSQL | localhost:5432 |
 
-Open the dashboard and upload a JPEG or PNG. The API applies the committed initial migration on startup when `Database__ApplyMigrations=true`. PostgreSQL and Python readiness checks gate API startup. If the dashboard initially reports a connection error while the API starts, use Refresh.
+Ports and model settings can be changed in `.env`. Refresh the dashboard if it opens before the API finishes starting.
 
 ```sh
 docker compose logs -f api ai
@@ -63,35 +68,61 @@ python3 scripts/smoke_test.py --base-url http://localhost:3000
 docker compose down
 ```
 
-The smoke test adds two demo analyses to the selected development database. `docker compose down` preserves the named PostgreSQL volume. `docker compose down -v` removes it and **deletes local database data**.
+The smoke test creates two analysis runs: the reference bus image and a blank image. `docker compose down` retains the PostgreSQL volume, including saved uploads. `docker compose down -v` **deletes local database data and images**.
 
-Compose is a local development configuration: ports bind to loopback and Swagger is enabled. It is not a production deployment configuration.
+Compose is configured for local development with loopback ports and Swagger enabled. It is not a production deployment configuration.
 
 ## Run services locally
 
-Prerequisites: .NET 10 SDK, Node.js 22.12+ (Node 22 recommended), Python 3.12–3.14, PostgreSQL 17+.
+Prerequisites: .NET 10 SDK, Node.js 22.12+ (Node 22 recommended), Python 3.12–3.14 on a supported PyTorch platform, and PostgreSQL 17+. This feature was verified locally on macOS ARM64 with Python 3.14 and PostgreSQL 18. CI uses Python 3.12 and PostgreSQL 17.
 
-You can use an existing PostgreSQL instance with a dedicated database/user, or start only the Compose database after preparing `.env`:
+Use an existing database and dedicated user, or prepare root `.env` and start the Compose database only:
 
 ```sh
 docker compose up -d db
 ```
 
-### 1. Analyzer (terminal 1)
+### 1. Python analyzer (terminal 1)
 
 ```sh
 cd ai-service
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
+python -m scripts.download_model --output .models/yolo11n.pt
+cp .env.example .env
+set -a
+source .env
+set +a
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-On Windows, activate with `.venv\Scripts\Activate.ps1` instead of `source`.
+Weights are ignored by Git and verified by SHA-256 during download and model loading. An already verified file is reused. There is no first-request model download; a missing or invalid model causes a clear startup failure.
 
-### 2. API (terminal 2, repository root)
+On Linux CPU machines, install CPU PyTorch wheels **before** the remaining requirements to avoid downloading CUDA dependencies:
 
-Replace the database values below to match your local PostgreSQL configuration. Do not commit credentials.
+```sh
+python -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-dev.txt
+```
+
+On Windows, activate with `.venv\Scripts\Activate.ps1` and set the example variables using `$env:VARIABLE='value'` rather than `source`.
+
+| Variable | Default/example | Purpose |
+| --- | --- | --- |
+| `YOLO_MODEL_PATH` | `.models/yolo11n.pt` | Required path to the supported verified model |
+| `YOLO_CONFIDENCE` | `0.35` | Minimum detection confidence, greater than 0 and at most 1 |
+| `YOLO_IMAGE_SIZE` | `960` | Inference size; multiple of 32 between 320 and 1536 |
+| `YOLO_DEVICE` | `cpu` | PyTorch inference device; CPU works without a GPU |
+| `YOLO_CONFIG_DIR` | `.ultralytics` | Ignored local model settings directory |
+| `YOLO_OFFLINE` | `true` | Disable upstream connectivity during inference |
+| `YOLO_AUTOINSTALL` | `false` | Fail instead of auto-installing missing model dependencies |
+
+Increase image size to experiment with smaller vehicles, or lower the confidence threshold to admit more uncertain detections. Neither guarantees accuracy. Settings require restarting Python; at most 300 detections are returned per image.
+
+### 2. .NET API (terminal 2, repository root)
+
+Replace the database values with your local configuration:
 
 ```sh
 export ConnectionStrings__ParkingDb='Host=localhost;Port=5432;Database=smartparking;Username=smartparking;Password=YOUR_LOCAL_PASSWORD'
@@ -102,9 +133,9 @@ export Database__ApplyMigrations='true'
 dotnet run --project server/SmartParking.Api --no-launch-profile
 ```
 
-In PowerShell use `$env:VARIABLE='value'` for each environment setting. Database migrations are opt-in so production migration ownership can be separated later. The design-time EF factory reads `ConnectionStrings__ParkingDb` for future migration commands.
+The API applies committed migrations only when opted in. The new migration adds vehicle detections and image storage while labeling existing runs `legacy-demo`. It does not delete previous results. Old demo counts are not shown as real measurements and their images are unavailable because the earlier version did not archive uploads.
 
-### 3. Dashboard (terminal 3)
+### 3. React dashboard (terminal 3)
 
 ```sh
 cd client
@@ -113,73 +144,75 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (normally http://localhost:5173). If the client reports that the API connection is not configured, create `client/.env` from the example, set `API_PROXY_TARGET` to the address printed by the running .NET server, and restart Vite. Both `npm run dev` and `npm run preview` forward API requests using this setting. `API_PROXY_TARGET` forwards `/api` to the .NET API during development. Docker uses nginx for the same route. `VITE_API_BASE_URL` can be set at build time for a separately hosted API; configure `Cors__Origins__0` on the API to the exact frontend origin in that case. No service URLs or credentials are embedded in application code.
+Open the address printed by Vite, normally http://localhost:5173. Set `API_PROXY_TARGET` in `client/.env` to the running .NET address and restart Vite if it differs from the example. Both development and preview modes forward `/api`; Docker uses nginx. `VITE_API_BASE_URL` is a build-time option for a separately hosted API; configure `Cors__Origins__0` to the exact frontend origin if using it.
+
+Upload a JPEG or PNG, then inspect the vehicle boxes and class counts. You can hide/show boxes, select a result to see its confidence, and use **View image** in history to inspect earlier snapshots. **Back to latest** restores the latest snapshot and its count.
 
 ## API
 
-Demo lot ID: `11111111-1111-1111-1111-111111111111`.
+Demo lot ID: `11111111-1111-1111-1111-111111111111`. The seeded 24 spaces are configuration retained from the first MVP; they are not measurements of uploaded images.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/parking-lots` | Configured lots and spaces |
+| GET | `/api/parking-lots` | Configured lots |
 | GET | `/api/parking-lots/{id}` | One lot |
 | GET | `/api/parking-lots/{id}/analyses?page=1&pageSize=20` | Newest-first history; page size 1–100 |
-| POST | `/api/parking-lots/{id}/analyses` | Analyze multipart field `image`; returns 201 and Location |
-| GET | `/api/parking-lots/{id}/analyses/{analysisId}` | Read the persisted snapshot |
-| GET | `/health` | Database connectivity readiness check |
-
-A snapshot includes IDs, UTC timestamp, filename, analyzer version, total/occupied/available counts, occupancy percentage and each space's label, occupied flag and confidence. History wraps snapshots in `{ items, total, page, pageSize }`. The frontend displays timestamps in the viewer's local timezone.
+| POST | `/api/parking-lots/{id}/analyses` | Multipart field `image`; returns 201 and Location |
+| GET | `/api/parking-lots/{id}/analyses/{analysisId}` | Persisted detection snapshot |
+| GET | `/api/parking-lots/{id}/analyses/{analysisId}/image` | Archived JPEG/PNG bytes; 404 for legacy runs |
+| GET | `/health` | Database connectivity readiness |
 
 ```sh
 curl -F 'image=@parking-lot.jpg' \
   http://localhost:8080/api/parking-lots/11111111-1111-1111-1111-111111111111/analyses
 ```
 
-The internal Python endpoint is `POST /analyze`, with multipart fields `image` and comma-separated `space_ids`. It returns `{ analyzer, spaces: [{ spaceId, occupied, confidence }] }`.
+A new snapshot includes identifiers, UTC `createdAt`, filename, `analyzer: "yolo11n-coco-v1"`, `mode: "vehicle-detection"`, `vehicleCount`, image dimensions, relative `imageUrl`, and detections. A detection contains `vehicleId`, `className`, `confidence` and `box: { x, y, width, height }`, normalized to the oriented image in the 0–1 range. Parking statistics are explicitly `null`. History wraps snapshots in `{ items, total, page, pageSize }`. Timestamps display in the viewer's timezone and use PostgreSQL-compatible microsecond precision.
 
-Uploads accept non-empty JPEG/PNG images up to 5 MiB and 16 megapixels. MIME checks are followed by actual decoding; invalid bytes and oversized images are rejected. Unknown resources return 404, invalid input returns 400, unavailable or inconsistent analyzer responses return 502, and analyzer timeout returns 504. The API waits at most 30 seconds for Python. Python is a dedicated internal service; the dashboard never calls it directly.
+The internal Python endpoint is `POST /analyze`, multipart field `image`; configured space IDs are no longer sent. It returns image dimensions, analyzer identity and detections. Existing .NET/Python/frontend containers should be rebuilt together because this replaces the demo response contract.
+
+Uploads accept non-empty JPEG/PNG images up to 5 MiB and 16 megapixels. Actual decoding follows MIME validation. Errors: 400 invalid upload, 404 unknown resource/image, 502 invalid/unavailable analyzer, 504 analyzer timeout. Python readiness is 503 until the model is loaded and warmed. The API waits at most 30 seconds for inference.
 
 ## Database
 
-- `ParkingLots`: lot identity and name.
-- `ParkingSpaces`: identity, lot foreign key and unique per-lot label.
-- `AnalysisRuns`: lot foreign key, UTC timestamp, sanitized image name and analyzer version. Indexed by lot and timestamp for history.
-- `OccupancyResults`: run/space composite primary key, occupied flag and confidence; foreign keys keep results attached to configured spaces.
+- `ParkingLots` and `ParkingSpaces`: existing configuration; space configuration is not detected capacity.
+- `AnalysisRuns`: lot, UTC timestamp, filename, analyzer, mode and oriented image dimensions; indexed for history.
+- `VehicleDetections`: run/vehicle composite key, class, confidence and normalized geometry.
+- `AnalysisImages`: one uploaded image and MIME type per real run, stored separately from history metadata.
+- `OccupancyResults`: preserved legacy demo data; new vehicle-only analyses do not create occupancy rows.
 
-Each successful analysis adds a new snapshot; previous results are preserved. Counts are derived from stored occupancy rows rather than duplicated aggregate columns. This supports historical analytics in a later iteration.
+All related rows are saved in one transaction. Historical images are retained until their analysis/database data is removed. Object storage and retention controls are possible future improvements if archive volume grows.
 
-## Verification and CI
-
-From the repository root:
+## Tests and CI
 
 ```sh
-npm ci --prefix client
 npm run build --prefix client
 npm test --prefix client
-dotnet restore server/SmartParking.Tests/SmartParking.Tests.csproj
+dotnet restore server/SmartParking.Tests/SmartParking.Tests.csproj --locked-mode
 dotnet build server/SmartParking.Tests/SmartParking.Tests.csproj --no-restore --configuration Release
 dotnet test server/SmartParking.Tests/SmartParking.Tests.csproj --no-build --configuration Release
-ai-service/.venv/bin/python -m pytest ai-service
-python3 scripts/smoke_test.py --base-url http://localhost:3000
 ```
 
-Use the active virtual environment's `python -m pytest` equivalent on Windows.
+With the Python environment activated and model variables exported, from `ai-service`:
 
-Client tests cover input validation, history rendering, error/retry handling and multipart upload with snapshot updates. Backend tests cover persistence, totals, invalid/oversized images, missing resources, upstream failures/inconsistent results, HTTP problem responses and Swagger generation. Backend tests use relational SQLite in memory; the smoke test verifies the actual PostgreSQL and Python integration, including deterministic results, the created-resource round trip and rejection without persistence.
+```sh
+python -m pytest
+```
 
-CI runs for **pull requests targeting `main` and pushes to `main`**. It installs/builds/tests each service, then builds and runs all four services with Compose and executes the smoke test. Integration services and volumes are disposable. There are no deployment, automatic PR, automatic merge, release or dependency-bot workflows.
+The real-model test is skipped only when `YOLO_MODEL_PATH` is unset. CI explicitly downloads the verified model and sets the variable, so real inference is tested there. Test doubles isolate endpoint and geometry failures; they are never runtime fallback analyzers.
 
-Local verification during implementation: React build and 6 tests, .NET build and 16 tests, Python 7 tests, and the real frontend-proxy → .NET → Python → PostgreSQL smoke test passed. PostgreSQL 18 was run temporarily for that test. Docker/Compose is not installed in the implementation environment, so container builds and the PostgreSQL 17 Compose stack still need execution in CI or on a Docker-enabled machine. Browser automation was unavailable; browser visual/manual QA remains outstanding.
+Local verification: React build and **15 tests**, .NET Release build and **30 tests**, Python **12 tests including real inference**, Swagger generation, and the full frontend-proxy → .NET → YOLO → PostgreSQL smoke test passed. That test validates a detected bus, a blank-image zero, unknown parking statistics, exact saved JSON/image round trips, historical results and invalid-upload rejection without persistence.
 
-## Git workflow
+CI runs on pull requests targeting `main` and pushes to `main`, with service builds/tests plus a disposable four-service Compose integration check. Docker is not installed in this implementation environment, so the new Docker build still requires execution in CI or on a Docker-enabled machine. Browser automation is unavailable locally; responsive layout and overlay appearance still need visual review. Component tests cover normalized box placement, visibility, image errors, history selection and keeping capacity unknown.
 
-The initial MVP is on `feature/mvp-foundation`, with commits grouped by API/database, analyzer, dashboard, infrastructure, CI and documentation. Keep `main` stable; review the feature branch before merging. No pull request is created automatically. Later meaningful changes can use `feature/image-analysis`, `feature/ai-service`, or similar branches. Never commit `.env`, build output, virtual environments, IDE files or credentials.
+## Model and fixture sources
 
-## Limits and next iteration
+- Model: [Ultralytics YOLO11 documentation](https://docs.ultralytics.com/models/yolo11), official `yolo11n.pt` COCO weights.
+- Model/runtime licensing: [Ultralytics upstream license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE).
+- Test image: official Ultralytics `bus.jpg`; source and license links are included alongside the fixture.
 
-- The detector is simulated; occupancy must not be used for real parking decisions. The map is a schematic, not an overlay or measured parking-space geometry.
-- One seeded demo lot; the API/schema identify lots independently, but lot administration and selection are future work.
-- No authentication, rate limiting, camera feeds, realtime updates, notifications or production deployment.
-- Images are not archived. History stores occupancy and filenames, not a historical image preview.
-- The next vision iteration needs configured parking-space polygons and camera calibration, then a YOLO/OpenCV implementation behind `ParkingAnalyzer` plus an evaluation dataset and meaningful confidence scoring.
-- Authentication, multi-lot management, historical aggregation and cloud deployment can follow once the basic detector is validated.
+No model weights, settings, `.env` files, dependency caches, build output or IDE files should be committed. Feature work stays on `feature/vehicle-detection` until reviewed. No PR or merge is created automatically.
+
+## Next iteration
+
+Parking-space detection is the next separate task: identify empty and occupied space boundaries, match vehicles to spaces, and evaluate against labeled parking-lot images before reporting capacity or availability. Other future work includes aerial/small-vehicle tuning, camera calibration, authentication, multiple-lot management, image-retention controls and production deployment.
