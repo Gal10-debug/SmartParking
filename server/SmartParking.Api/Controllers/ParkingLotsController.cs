@@ -17,6 +17,14 @@ public sealed class ParkingLotsController(ParkingService service) : ControllerBa
         Ok(await service.GetHistoryAsync(id, page, pageSize, ct));
     [HttpGet("{id:guid}/analyses/{analysisId:guid}")]
     public async Task<ActionResult<AnalysisDto>> GetAnalysis(Guid id, Guid analysisId, CancellationToken ct) => Ok(await service.GetAnalysisAsync(id, analysisId, ct));
+    [HttpGet("{id:guid}/analyses/{analysisId:guid}/image")]
+    public async Task<IActionResult> GetImage(Guid id, Guid analysisId, CancellationToken ct)
+    {
+        var image = await service.GetImageAsync(id, analysisId, ct);
+        Response.Headers.CacheControl = "private, max-age=3600";
+        Response.Headers.XContentTypeOptions = "nosniff";
+        return File(image.Data, image.ContentType);
+    }
     [HttpPost("{id:guid}/analyses")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(6 * 1024 * 1024)]

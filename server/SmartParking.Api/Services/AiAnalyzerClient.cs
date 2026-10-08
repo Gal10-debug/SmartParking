@@ -7,19 +7,18 @@ namespace SmartParking.Api.Services;
 
 public interface IAiAnalyzer
 {
-    Task<AnalyzerResponse> AnalyzeAsync(IFormFile image, IReadOnlyList<int> spaceIds, CancellationToken cancellationToken);
+    Task<AnalyzerResponse> AnalyzeAsync(IFormFile image, CancellationToken cancellationToken);
 }
 
 public sealed class AiAnalyzerClient(HttpClient client) : IAiAnalyzer
 {
-    public async Task<AnalyzerResponse> AnalyzeAsync(IFormFile image, IReadOnlyList<int> spaceIds, CancellationToken cancellationToken)
+    public async Task<AnalyzerResponse> AnalyzeAsync(IFormFile image, CancellationToken cancellationToken)
     {
         using var form = new MultipartFormDataContent();
         using var stream = image.OpenReadStream();
         var content = new StreamContent(stream);
         content.Headers.ContentType = new MediaTypeHeaderValue(image.ContentType);
         form.Add(content, "image", "upload");
-        form.Add(new StringContent(string.Join(",", spaceIds)), "space_ids");
         try
         {
             using var response = await client.PostAsync("analyze", form, cancellationToken);

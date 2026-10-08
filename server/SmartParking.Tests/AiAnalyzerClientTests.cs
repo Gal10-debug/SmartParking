@@ -16,7 +16,7 @@ public sealed class AiAnalyzerClientTests
     {
         using var http = new HttpClient(new StubHandler((HttpStatusCode)upstream)) { BaseAddress = new Uri("http://analyzer/") };
         var image = new FormFile(new MemoryStream([1]), 0, 1, "image", "test.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
-        var error = await Assert.ThrowsAsync<ApiException>(() => new AiAnalyzerClient(http).AnalyzeAsync(image, [1], default));
+        var error = await Assert.ThrowsAsync<ApiException>(() => new AiAnalyzerClient(http).AnalyzeAsync(image, default));
         Assert.Equal(expected, error.StatusCode);
     }
     [Fact]
@@ -24,7 +24,19 @@ public sealed class AiAnalyzerClientTests
     {
         using var http = new HttpClient(new StubHandler(HttpStatusCode.OK)) { BaseAddress = new Uri("http://analyzer/") };
         var image = new FormFile(new MemoryStream([1]), 0, 1, "image", "test.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
-        Assert.Equal(502, (await Assert.ThrowsAsync<ApiException>(() => new AiAnalyzerClient(http).AnalyzeAsync(image, [1], default))).StatusCode);
+        Assert.Equal(502, (await Assert.ThrowsAsync<ApiException>(() => new AiAnalyzerClient(http).AnalyzeAsync(image, default))).StatusCode);
+    }
+    [Fact]
+    public async Task MissingDetectionFieldsAreRejectedInsteadOfDefaultingToZero()
+    {
+        using var http = new HttpClient(new MissingFieldsHandler()) { BaseAddress = new Uri("http://analyzer/") };
+        var image = new FormFile(new MemoryStream([1]), 0, 1, "image", "test.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+        Assert.Equal(502, (await Assert.ThrowsAsync<ApiException>(() => new AiAnalyzerClient(http).AnalyzeAsync(image, default))).StatusCode);
+    }
+    private sealed class MissingFieldsHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"analyzer\":\"broken\"}") });
     }
     private sealed class StubHandler(HttpStatusCode status) : HttpMessageHandler
     {

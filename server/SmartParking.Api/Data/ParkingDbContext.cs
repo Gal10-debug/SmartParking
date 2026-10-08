@@ -11,6 +11,9 @@ public sealed class ParkingDbContext(DbContextOptions<ParkingDbContext> options)
     public DbSet<AnalysisRun> AnalysisRuns => Set<AnalysisRun>();
     public DbSet<OccupancyResult> OccupancyResults => Set<OccupancyResult>();
 
+    public DbSet<VehicleDetection> VehicleDetections => Set<VehicleDetection>();
+    public DbSet<AnalysisImage> AnalysisImages => Set<AnalysisImage>();
+
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<ParkingLot>().Property(x => x.Name).HasMaxLength(120);
@@ -21,6 +24,13 @@ public sealed class ParkingDbContext(DbContextOptions<ParkingDbContext> options)
         model.Entity<AnalysisRun>().HasIndex(x => new { x.ParkingLotId, x.CreatedAt });
         model.Entity<AnalysisRun>().Property(x => x.ImageName).HasMaxLength(255);
         model.Entity<AnalysisRun>().Property(x => x.Analyzer).HasMaxLength(80);
+        model.Entity<AnalysisRun>().Property(x => x.Mode).HasMaxLength(30).HasDefaultValue("legacy-demo");
+        model.Entity<AnalysisRun>().HasMany(x => x.Detections).WithOne().HasForeignKey(x => x.AnalysisRunId);
+        model.Entity<VehicleDetection>().HasKey(x => new { x.AnalysisRunId, x.VehicleId });
+        model.Entity<VehicleDetection>().Property(x => x.ClassName).HasMaxLength(20);
+        model.Entity<AnalysisImage>().HasKey(x => x.AnalysisRunId);
+        model.Entity<AnalysisImage>().Property(x => x.ContentType).HasMaxLength(30);
+        model.Entity<AnalysisRun>().HasOne(x => x.Image).WithOne().HasForeignKey<AnalysisImage>(x => x.AnalysisRunId);
         model.Entity<AnalysisRun>().HasMany(x => x.Results).WithOne().HasForeignKey(x => x.AnalysisRunId);
         model.Entity<OccupancyResult>().HasKey(x => new { x.AnalysisRunId, x.ParkingSpaceId });
         model.Entity<OccupancyResult>().HasOne<ParkingSpace>().WithMany().HasForeignKey(x => x.ParkingSpaceId).OnDelete(DeleteBehavior.Restrict);
