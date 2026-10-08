@@ -1,5 +1,8 @@
 # SmartParking
 
+For the overhead-image detector comparison and reproducible local evaluation,
+see [the aerial model evaluation](docs/aerial-model-evaluation.md).
+
 A full-stack vehicle-detection dashboard. Upload a parking-lot or street image to detect visible **cars, motorcycles, buses and trucks**, inspect bounding boxes and confidence scores, and revisit saved images in analysis history.
 
 The Python service now runs a real, pretrained **YOLO11n COCO model on CPU**. There is no simulated detector or fallback for new analyses. Model failures are reported as errors.
