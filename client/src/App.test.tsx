@@ -67,6 +67,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('identifies saved aerial results and explains the van category', async () => {
+  mockLoad([{ ...result, analyzer: 'yolov8s-visdrone-cbcca22c-v1' }]);
+  render(<App />);
+  expect(
+    await screen.findByText('Aerial vehicle model · Cars includes vans'),
+  ).toBeInTheDocument();
+  expect(stats().getByText('1')).toBeInTheDocument();
+});
+
 it('loads saved detections and keeps parking capacity unknown', async () => {
   mockLoad([result]);
   render(<App />);

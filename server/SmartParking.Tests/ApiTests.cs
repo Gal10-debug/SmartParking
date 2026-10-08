@@ -47,6 +47,7 @@ public sealed class ApiTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var result = (await response.Content.ReadFromJsonAsync<AnalysisDto>())!;
         Assert.Equal(1, result.VehicleCount); Assert.Null(result.AvailableSpaces);
+        Assert.Equal("yolov8s-visdrone-cbcca22c-v1", result.Analyzer);
         var saved = await client.GetAsync(response.Headers.Location);
         Assert.Equal(await response.Content.ReadAsStringAsync(), await saved.Content.ReadAsStringAsync());
         var image = await client.GetAsync(result.ImageUrl);
@@ -61,7 +62,7 @@ public sealed class ApiTests
     private sealed class TestAnalyzer : IAiAnalyzer
     {
         public Task<AnalyzerResponse> AnalyzeAsync(Microsoft.AspNetCore.Http.IFormFile image, CancellationToken ct) =>
-            Task.FromResult(new AnalyzerResponse("test", "vehicle-detection", 100, 100,
+            Task.FromResult(new AnalyzerResponse("yolov8s-visdrone-cbcca22c-v1", "vehicle-detection", 100, 100,
                 [new VehicleDetectionDto(1, "car", .9, new BoundingBoxDto(.1, .2, .3, .4))]));
     }
 
