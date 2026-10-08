@@ -23,4 +23,5 @@
 **/.models/
 **/.ultralytics/
 *.pt
+**/.evaluation/
 **/bin\\*/
