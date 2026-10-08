@@ -5,7 +5,7 @@ see [the aerial model evaluation](docs/aerial-model-evaluation.md).
 
 A full-stack vehicle-detection dashboard. Upload a parking-lot or street image to detect visible **cars, motorcycles, buses and trucks**, inspect bounding boxes and confidence scores, and revisit saved images in analysis history.
 
-The Python service now runs a real, pretrained **YOLO11n COCO model on CPU**. There is no simulated detector or fallback for new analyses. Model failures are reported as errors.
+The Python service now runs a real, pretrained **YOLOv8s VisDrone aerial model on CPU** (pinned revision and checksum). There is no simulated detector or fallback for new analyses. Model failures are reported as errors.
 
 **Vehicle detection is not parking-space detection.** Capacity, occupied spaces, available spaces and occupancy percentage remain unknown. Detected vehicles can include moving traffic, and the model can miss or misclassify vehicles. A zero result means no detections above the threshold, not that a parking lot is empty.
 
@@ -16,7 +16,7 @@ flowchart LR
     Browser[React / TypeScript dashboard] -->|REST + multipart image| API[ASP.NET Core API]
     API -->|HTTP image| AI[Python / FastAPI]
     AI --> Interface[VehicleAnalyzer interface]
-    Interface --> YOLO[YOLO11n / CPU inference]
+    Interface --> YOLO[YOLOv8s VisDrone / CPU inference]
     API -->|EF Core| DB[(PostgreSQL)]
     API -->|Saved results + image endpoint| Browser
 ```
@@ -53,7 +53,7 @@ docker compose config --quiet
 docker compose up --build -d
 ```
 
-Open **http://localhost:3000**. The first build downloads Python/PyTorch dependencies and the 5.6 MB model. The analyzer image installs CPU-only PyTorch wheels and OpenCV runtime libraries. Model weights are downloaded and checksum-verified at build time; runtime inference operates offline. The health check waits for model loading and warm-up before the API starts.
+Open **http://localhost:3000**. The first build downloads Python/PyTorch dependencies and the 23 MB aerial model. The analyzer image installs CPU-only PyTorch wheels and OpenCV runtime libraries. Model weights are downloaded and checksum-verified at build time; runtime inference operates offline. The health check waits for model loading and warm-up before the API starts.
 
 | Service | Default local address |
 | --- | --- |
@@ -92,13 +92,34 @@ cd ai-service
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
-python -m scripts.download_model --output .models/yolo11n.pt
+python -m scripts.download_model --profile aerial --output .models/visdrone-yolov8s.pt
 cp .env.example .env
 set -a
 source .env
 set +a
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+The aerial profile is the default for new uploads. It maps VisDrone vans to the
+API's `car` category and motors to `motorcycle`; class-agnostic suppression avoids
+counting overlapping car/van predictions twice. Saved results retain their model
+identity. Older analyses are unchanged; upload again to analyse with the new model.
+
+To use the previous general model locally:
+
+```sh
+python -m scripts.download_model --profile coco --output .models/yolo11n.pt
+export YOLO_MODEL_PROFILE=coco
+export YOLO_MODEL_PATH=.models/yolo11n.pt
+# Restart uvicorn after changing the profile.
+```
+
+The selected profile and weights must match or startup fails. The aerial model
+improves the supplied examples from 0/0/30 to 36/5/39 detections. These three
+samples do not establish general accuracy. Small edge vehicles can still be
+missed, and the street-level bus fixture is misclassified as a truck by the aerial
+model. The COCO profile still classifies that fixture as a bus. Parking statistics
+remain unknown.
 
 Weights are ignored by Git and verified by SHA-256 during download and model loading. An already verified file is reused. There is no first-request model download; a missing or invalid model causes a clear startup failure.
 
@@ -113,7 +134,8 @@ On Windows, activate with `.venv\Scripts\Activate.ps1` and set the example varia
 
 | Variable | Default/example | Purpose |
 | --- | --- | --- |
-| `YOLO_MODEL_PATH` | `.models/yolo11n.pt` | Required path to the supported verified model |
+| `YOLO_MODEL_PROFILE` | `aerial` | Supported model profile: `aerial` or `coco` |
+| `YOLO_MODEL_PATH` | `.models/visdrone-yolov8s.pt` | Required path matching the selected verified profile |
 | `YOLO_CONFIDENCE` | `0.35` | Minimum detection confidence, greater than 0 and at most 1 |
 | `YOLO_IMAGE_SIZE` | `960` | Inference size; multiple of 32 between 320 and 1536 |
 | `YOLO_DEVICE` | `cpu` | PyTorch inference device; CPU works without a GPU |
@@ -170,7 +192,7 @@ curl -F 'image=@parking-lot.jpg' \
   http://localhost:8080/api/parking-lots/11111111-1111-1111-1111-111111111111/analyses
 ```
 
-A new snapshot includes identifiers, UTC `createdAt`, filename, `analyzer: "yolo11n-coco-v1"`, `mode: "vehicle-detection"`, `vehicleCount`, image dimensions, relative `imageUrl`, and detections. A detection contains `vehicleId`, `className`, `confidence` and `box: { x, y, width, height }`, normalized to the oriented image in the 0–1 range. Parking statistics are explicitly `null`. History wraps snapshots in `{ items, total, page, pageSize }`. Timestamps display in the viewer's timezone and use PostgreSQL-compatible microsecond precision.
+A new snapshot includes identifiers, UTC `createdAt`, filename, `analyzer: "yolov8s-visdrone-cbcca22c-v1"`, `mode: "vehicle-detection"`, `vehicleCount`, image dimensions, relative `imageUrl`, and detections. A detection contains `vehicleId`, `className`, `confidence` and `box: { x, y, width, height }`, normalized to the oriented image in the 0–1 range. Parking statistics are explicitly `null`. History wraps snapshots in `{ items, total, page, pageSize }`. Timestamps display in the viewer's timezone and use PostgreSQL-compatible microsecond precision.
 
 The internal Python endpoint is `POST /analyze`, multipart field `image`; configured space IDs are no longer sent. It returns image dimensions, analyzer identity and detections. Existing .NET/Python/frontend containers should be rebuilt together because this replaces the demo response contract.
 
@@ -204,17 +226,18 @@ python -m pytest
 
 The real-model test is skipped only when `YOLO_MODEL_PATH` is unset. CI explicitly downloads the verified model and sets the variable, so real inference is tested there. Test doubles isolate endpoint and geometry failures; they are never runtime fallback analyzers.
 
-Local verification: React build and **15 tests**, .NET Release build and **30 tests**, Python **12 tests including real inference**, Swagger generation, and the full frontend-proxy → .NET → YOLO → PostgreSQL smoke test passed. That test validates a detected bus, a blank-image zero, unknown parking statistics, exact saved JSON/image round trips, historical results and invalid-upload rejection without persistence.
+Local verification: React build and **16 tests**, .NET Release build and **30 tests**, Python **16 tests per profile including real inference**, Swagger generation, and the full frontend-proxy → .NET → YOLO → PostgreSQL smoke test passed. That test validates a detected vehicle, a blank-image zero, unknown parking statistics, exact saved JSON/image round trips, historical results and invalid-upload rejection without persistence.
 
 CI runs on pull requests targeting `main` and pushes to `main`, with service builds/tests plus a disposable four-service Compose integration check. Docker is not installed in this implementation environment, so the new Docker build still requires execution in CI or on a Docker-enabled machine. Browser automation is unavailable locally; responsive layout and overlay appearance still need visual review. Component tests cover normalized box placement, visibility, image errors, history selection and keeping capacity unknown.
 
 ## Model and fixture sources
 
-- Model: [Ultralytics YOLO11 documentation](https://docs.ultralytics.com/models/yolo11), official `yolo11n.pt` COCO weights.
+- Default model: [dronefreak/visdrone-yolov8s](https://huggingface.co/dronefreak/visdrone-yolov8s), AGPL-3.0, pinned revision `cbcca22c6388563fee903e67794dd4ee7755f4a1`.
+- Optional general model: [Ultralytics YOLO11](https://docs.ultralytics.com/models/yolo11), official `yolo11n.pt` COCO weights.
 - Model/runtime licensing: [Ultralytics upstream license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE).
 - Test image: official Ultralytics `bus.jpg`; source and license links are included alongside the fixture.
 
-No model weights, settings, `.env` files, dependency caches, build output or IDE files should be committed. Feature work stays on `feature/vehicle-detection` until reviewed. No PR or merge is created automatically.
+No model weights, settings, `.env` files, dependency caches, build output or IDE files should be committed. Feature work stays on feature branches until reviewed. No PR or merge is created automatically.
 
 ## Next iteration
 
