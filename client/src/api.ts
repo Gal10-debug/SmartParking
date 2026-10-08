@@ -2,16 +2,35 @@ import type { Analysis, History, ParkingLot } from './types';
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${base}/api${path}`, init);
-  if (!response.ok) {
-    const problem = (await response.json().catch(() => ({}))) as {
-      detail?: string;
-      title?: string;
-    };
+  const contentType = response.headers
+    .get('Content-Type')
+    ?.split(';')[0]
+    .trim()
+    .toLowerCase();
+  if (contentType !== 'application/json' && !contentType?.endsWith('+json')) {
     throw new Error(
-      problem.detail ?? problem.title ?? `Request failed (${response.status}).`,
+      response.ok
+        ? 'The parking service returned a web page instead of data. Check the client API connection settings.'
+        : `Cannot connect to the parking service (HTTP ${response.status}). Check that the server is running.`,
     );
   }
-  return response.json() as Promise<T>;
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      'The parking service returned invalid JSON. Try again or check the server logs.',
+    );
+  }
+  if (!response.ok) {
+    const problem = data as { detail?: string; title?: string } | null;
+    throw new Error(
+      problem?.detail ??
+        problem?.title ??
+        `Request failed (${response.status}).`,
+    );
+  }
+  return data as T;
 }
 export const api = {
   lots: () => request<ParkingLot[]>('/parking-lots'),

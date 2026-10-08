@@ -24,9 +24,14 @@ it('loads persisted history and renders occupancy', async () => {
     'fetch',
     vi
       .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => [lot] })
       .mockResolvedValueOnce({
         ok: true,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => [lot],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
         json: async () => ({
           items: [result],
           total: 1,
@@ -46,9 +51,14 @@ it('shows API errors with retry', async () => {
   const fetch = vi
     .fn()
     .mockRejectedValueOnce(new Error('Service unavailable'))
-    .mockResolvedValueOnce({ ok: true, json: async () => [lot] })
     .mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => [lot],
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       json: async () => ({ items: [], total: 0, page: 1, pageSize: 10 }),
     });
   vi.stubGlobal('fetch', fetch);
@@ -72,14 +82,24 @@ it('submits multipart image data and updates the persisted snapshot', async () =
   });
   const fetch = vi
     .fn()
-    .mockResolvedValueOnce({ ok: true, json: async () => [lot] })
     .mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => [lot],
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       json: async () => ({ items: [], total: 0, page: 1, pageSize: 10 }),
     })
-    .mockResolvedValueOnce({ ok: true, json: async () => result })
     .mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => result,
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       json: async () => ({ items: [result], total: 1, page: 1, pageSize: 10 }),
     });
   vi.stubGlobal('fetch', fetch);

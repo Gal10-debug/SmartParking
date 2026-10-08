@@ -113,7 +113,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (normally http://localhost:5173). `API_PROXY_TARGET` forwards `/api` to the .NET API during development. Docker uses nginx for the same route. `VITE_API_BASE_URL` can be set at build time for a separately hosted API; configure `Cors__Origins__0` on the API to the exact frontend origin in that case. No service URLs or credentials are embedded in application code.
+Open the URL printed by Vite (normally http://localhost:5173). If the client reports that the API connection is not configured, create `client/.env` from the example, set `API_PROXY_TARGET` to the address printed by the running .NET server, and restart Vite. Both `npm run dev` and `npm run preview` forward API requests using this setting. `API_PROXY_TARGET` forwards `/api` to the .NET API during development. Docker uses nginx for the same route. `VITE_API_BASE_URL` can be set at build time for a separately hosted API; configure `Cors__Origins__0` on the API to the exact frontend origin in that case. No service URLs or credentials are embedded in application code.
 
 ## API
 
