@@ -453,98 +453,6 @@ main {
   font-weight: 600;
   color: #82856d;
 }
-.map-legend {
-  display: flex;
-  gap: 17px;
-  margin: 22px 0 18px;
-  font-size: 10px;
-  color: #7e8d80;
-}
-.map-legend > span {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.legend-box {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-}
-.available {
-  background: #e6f0e3;
-  color: #628366;
-  border-color: #c2d8bb;
-}
-.occupied {
-  background: #405c4d;
-  color: #eff8ed;
-  border-color: #405c4d;
-}
-.unknown {
-  background: #edf0eb;
-  color: #a7b3a4;
-  border-color: #d9e0d5;
-}
-.parking-lot {
-  background: #f6f8f3;
-  border: 1px solid #e6ebe0;
-  border-radius: 9px;
-  padding: 19px 16px 22px;
-  min-height: 290px;
-}
-.lot-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  color: #83977c;
-  margin-bottom: 22px;
-}
-.parking-row {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 5px;
-}
-.parking-space {
-  border: 1px solid;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  min-width: 0;
-  height: 73px;
-  padding: 8px 0;
-}
-.parking-space > span:first-child {
-  font-size: 8px;
-  font-weight: 600;
-}
-.space-mark {
-  font-size: 17px;
-  line-height: 23px;
-  font-family: 'Manrope', sans-serif;
-}
-.driving-lane {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 21px 0;
-  color: #a1ae96;
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-.lane-dashes {
-  flex: 1;
-  border-top: 1px dashed #c5cebc;
-}
-.map-caption {
-  font-size: 9px;
-  color: #95a08d;
-  line-height: 1.6;
-  margin-top: 14px;
-}
 .history-panel {
   margin-top: 24px;
   scroll-margin-top: 20px;
@@ -697,12 +605,6 @@ footer {
   .dropzone {
     height: 250px;
   }
-  .parking-lot {
-    min-height: 320px;
-  }
-  .parking-space {
-    height: 87px;
-  }
 }
 @media (max-width: 1150px) {
   .sidebar {
@@ -720,12 +622,6 @@ footer {
   }
   .analysis-grid {
     grid-template-columns: 1fr;
-  }
-  .parking-space {
-    height: 82px;
-  }
-  .parking-lot {
-    min-height: 290px;
   }
   .stats {
     gap: 10px;
@@ -815,25 +711,6 @@ footer {
   .panel {
     padding: 19px;
   }
-  .parking-lot {
-    padding: 16px 8px;
-    min-height: 250px;
-  }
-  .parking-row {
-    gap: 3px;
-  }
-  .parking-space {
-    height: 63px;
-  }
-  .parking-space svg {
-    width: 16px;
-  }
-  .parking-space > span:first-child {
-    font-size: 7px;
-  }
-  .map-legend {
-    gap: 12px;
-  }
   footer {
     flex-direction: column;
     line-height: 1.6;
@@ -849,5 +726,206 @@ footer {
   }
   html {
     scroll-behavior: auto;
+  }
+}
+
+.stat-unknown {
+  font-size: 25px;
+  letter-spacing: -0.6px;
+  line-height: 1.98;
+}
+.snapshot-notice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #eaf3e8;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.detection-empty {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  background: #f6f8f3;
+  border-radius: 9px;
+  padding: 28px;
+  margin-top: 20px;
+  color: #87a080;
+}
+.detection-empty strong {
+  color: #4d6950;
+  font-size: 14px;
+}
+.detection-empty p {
+  max-width: 340px;
+  font-size: 12px;
+}
+.detection-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.class-chip {
+  display: flex;
+  gap: 9px;
+  font-size: 10px;
+  padding: 6px 9px;
+  border: 1px solid #e0e9de;
+  border-radius: 5px;
+  background: #f6f9f3;
+}
+.class-chip strong {
+  color: #325841;
+}
+.detection-image {
+  position: relative;
+  width: 100%;
+  background: #edf1e9;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.detection-image > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-orientation: from-image;
+}
+.image-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #7b8e73;
+  font-size: 12px;
+}
+.detection-box {
+  position: absolute;
+  border: 2px solid var(--box-color, #78dc94);
+  background: transparent;
+  padding: 0;
+  border-radius: 2px;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+}
+.car {
+  --box-color: #78dc94;
+}
+.motorcycle {
+  --box-color: #52d5d0;
+}
+.bus {
+  --box-color: #7cb9ff;
+}
+.truck {
+  --box-color: #f1c85b;
+}
+.detection-box.selected {
+  box-shadow: 0 0 0 2px white;
+  background: #fff2;
+}
+.box-number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--box-color);
+  color: #16382a;
+  font-size: 9px;
+  line-height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  font-weight: 700;
+}
+.box-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 5px;
+  background: var(--box-color);
+  color: #16382a;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.detection-box:hover .box-label,
+.detection-box:focus .box-label,
+.detection-box.selected .box-label {
+  opacity: 1;
+}
+.detection-caption {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #839579;
+  margin: 12px 0;
+}
+.detection-list {
+  max-height: 170px;
+  overflow: auto;
+  border: 1px solid #e5ebdf;
+  border-radius: 7px;
+}
+.detection-item {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #edf1e8;
+  background: white;
+  padding: 9px 12px;
+  justify-content: flex-start;
+  text-transform: capitalize;
+  font-size: 11px;
+}
+.detection-item:last-child {
+  border-bottom: 0;
+}
+.detection-item.selected {
+  background: #edf5e9;
+}
+.detection-item .muted {
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: none;
+}
+.detection-number {
+  background: var(--box-color);
+  border-radius: 3px;
+  font-size: 9px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+}
+.detection-disclaimer {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #8f977f;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid #eaf0e3;
+}
+@media (max-width: 760px) {
+  .stat-unknown {
+    font-size: 23px;
+    line-height: 1.85;
+  }
+  .snapshot-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .detection-panel .section-title {
+    align-items: flex-start;
+  }
+  .detection-panel .section-title .secondary {
+    padding: 7px;
+    font-size: 10px;
   }
 }

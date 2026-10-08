@@ -22,7 +22,7 @@ export function UploadPanel({ busy, disabled, onAnalyze }: Props) {
     return () => URL.revokeObjectURL(url);
   }, [file]);
   function select(next?: File) {
-    if (!next || busy) return;
+    if (!next || busy || disabled) return;
     const invalid = validateImage(next);
     setError(invalid ?? '');
     if (!invalid) setFile(next);
@@ -37,7 +37,8 @@ export function UploadPanel({ busy, disabled, onAnalyze }: Props) {
         <ImagePlus size={22} />
       </div>
       <p className="muted">
-        Upload a parking-lot image to generate a new occupancy snapshot.
+        Upload an image to find visible vehicles and inspect their detection
+        boxes.
       </p>
       <div
         className={`dropzone ${dragging ? 'dragging' : ''}`}
@@ -129,8 +130,8 @@ export function UploadPanel({ busy, disabled, onAnalyze }: Props) {
       <div className="demo-note">
         <span className="status-dot amber" />
         <span>
-          <strong>Demo analyzer</strong> · Results are simulated from image
-          pixels. Real vehicle detection is coming next.
+          <strong>Real vehicle detection</strong> · Cars, motorcycles, buses and
+          trucks. Parking spaces are not detected yet.
         </span>
       </div>
     </section>

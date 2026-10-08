@@ -7,11 +7,18 @@ export interface ParkingLot {
   name: string;
   spaces: Space[];
 }
-export interface Occupancy {
-  spaceId: number;
-  label: string;
-  occupied: boolean;
+export type VehicleClass = 'car' | 'motorcycle' | 'bus' | 'truck';
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface VehicleDetection {
+  vehicleId: number;
+  className: VehicleClass;
   confidence: number;
+  box: BoundingBox;
 }
 export interface Analysis {
   id: string;
@@ -19,11 +26,16 @@ export interface Analysis {
   createdAt: string;
   imageName: string;
   analyzer: string;
-  totalSpaces: number;
-  occupiedSpaces: number;
-  availableSpaces: number;
-  occupancyPercentage: number;
-  spaces: Occupancy[];
+  mode: 'vehicle-detection' | 'legacy-demo';
+  vehicleCount: number | null;
+  imageWidth: number;
+  imageHeight: number;
+  imageUrl: string | null;
+  totalSpaces: number | null;
+  occupiedSpaces: number | null;
+  availableSpaces: number | null;
+  occupancyPercentage: number | null;
+  detections: VehicleDetection[];
 }
 export interface History {
   items: Analysis[];
