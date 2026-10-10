@@ -20,6 +20,10 @@ services:
       dockerfile: ai-service/Dockerfile
     environment:
       PORT: 8000
+      YOLO_MODEL_PATH: /models/yolo11n.pt
+      YOLO_DEVICE: cpu
+      YOLO_CONFIDENCE: ${YOLO_CONFIDENCE:-0.35}
+      YOLO_IMAGE_SIZE: ${YOLO_IMAGE_SIZE:-960}
     ports:
       - "127.0.0.1:${AI_HOST_PORT:-8000}:8000"
     healthcheck:
@@ -33,6 +37,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 90s
   api:
     build:
       context: .

@@ -18,3 +18,10 @@
 *.suo
 *.log
 *.tsbuildinfo
+
+**/.vite/
+**/.models/
+**/.ultralytics/
+*.pt
+**/.evaluation/
+**/bin\\*/

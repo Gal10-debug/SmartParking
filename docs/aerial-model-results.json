@@ -1,0 +1,61 @@
+{
+  "confidence": 0.35,
+  "imageSize": 960,
+  "device": "cpu",
+  "agnosticNms": true,
+  "iou": 0.5,
+  "models": {
+    "coco": {
+      "sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
+    },
+    "aerial": {
+      "url": "https://huggingface.co/dronefreak/visdrone-yolov8s/resolve/cbcca22c6388563fee903e67794dd4ee7755f4a1/best.pt",
+      "sha256": "29dae68ac5028cedac1f396333ac89cd9c74232691155243d70d9a1c16cdb24e",
+      "license": "AGPL-3.0"
+    }
+  },
+  "results": [
+    {
+      "sample": 0,
+      "imageSha256": "64ff18bfc934bbc5892de13cb7f3c18ab17d711d926c7ce6bbc1c6578f21ae5f",
+      "model": "coco",
+      "count": 0,
+      "inferenceSeconds": 0.0334
+    },
+    {
+      "sample": 1,
+      "imageSha256": "e270081bd8635ee8db751896ec10b46d13b6e0cc8fb14aaa0594c5a4c6bc399c",
+      "model": "coco",
+      "count": 0,
+      "inferenceSeconds": 0.0287
+    },
+    {
+      "sample": 2,
+      "imageSha256": "707b5d3e50f31b8fdb8a9e53fd6edc09831806ddf41fe6d997c78fb2909a604e",
+      "model": "coco",
+      "count": 30,
+      "inferenceSeconds": 0.047
+    },
+    {
+      "sample": 0,
+      "imageSha256": "64ff18bfc934bbc5892de13cb7f3c18ab17d711d926c7ce6bbc1c6578f21ae5f",
+      "model": "aerial",
+      "count": 36,
+      "inferenceSeconds": 0.0677
+    },
+    {
+      "sample": 1,
+      "imageSha256": "e270081bd8635ee8db751896ec10b46d13b6e0cc8fb14aaa0594c5a4c6bc399c",
+      "model": "aerial",
+      "count": 5,
+      "inferenceSeconds": 0.056
+    },
+    {
+      "sample": 2,
+      "imageSha256": "707b5d3e50f31b8fdb8a9e53fd6edc09831806ddf41fe6d997c78fb2909a604e",
+      "model": "aerial",
+      "count": 39,
+      "inferenceSeconds": 0.1006
+    }
+  ]
+}

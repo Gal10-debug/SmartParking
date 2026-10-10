@@ -13,12 +13,13 @@ import {
 import { api } from './api';
 import type { Analysis, History, ParkingLot } from './types';
 import { UploadPanel } from './components/UploadPanel';
-import { ParkingMap } from './components/ParkingMap';
+import { DetectionPanel } from './components/DetectionPanel';
 import { AnalysisHistory, formatDate } from './components/AnalysisHistory';
 
 export default function App() {
   const [lot, setLot] = useState<ParkingLot | null>(null);
   const [latest, setLatest] = useState<Analysis | null>(null);
+  const [selected, setSelected] = useState<Analysis | null>(null);
   const [history, setHistory] = useState<History | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -38,6 +39,7 @@ export default function App() {
       setLot(first);
       setHistory(data);
       setLatest(data.items[0] ?? null);
+      setSelected(data.items[0] ?? null);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : 'Unable to connect to the API.',
@@ -57,7 +59,8 @@ export default function App() {
     try {
       const result = await api.analyze(lot.id, file);
       setLatest(result);
-      setNotice('Analysis saved. Your occupancy snapshot is ready.');
+      setSelected(result);
+      setNotice('Analysis saved. Your vehicle detections are ready.');
       try {
         setHistory(await api.history(lot.id));
       } catch {
@@ -122,7 +125,7 @@ export default function App() {
           </div>
           <div className="sidebar-version">
             <span className="status-dot" />
-            SmartParking MVP<span>v1.0</span>
+            SmartParking MVP<span>v2.0</span>
           </div>
         </div>
       </aside>
@@ -133,7 +136,7 @@ export default function App() {
             <strong>Dashboard</strong>
           </span>
           <span className="topbar-label">
-            <span className="status-dot amber" /> DEMO ENVIRONMENT
+            <span className="status-dot amber" /> VEHICLE DETECTION
           </span>
         </header>
         <main id="dashboard">
@@ -144,7 +147,8 @@ export default function App() {
                 Parking dashboard<span className="heading-dot">.</span>
               </h1>
               <p className="muted">
-                Every space accounted for. Every decision a little smarter.
+                Find visible vehicles. Inspect the results. Build a clearer
+                picture.
               </p>
             </div>
             <button
@@ -175,7 +179,7 @@ export default function App() {
                 <CircleParking size={18} />
               </span>
               <strong>{lot?.name ?? 'Connecting to your parking lot…'}</strong>
-              <span className="pill subtle">DEMO LOT</span>
+              <span className="pill subtle">EXAMPLE LOT</span>
             </div>
             <span className="muted small">
               {latest
@@ -183,35 +187,49 @@ export default function App() {
                 : 'No analysis yet'}
             </span>
           </div>
+          {selected && latest && selected.id !== latest.id && (
+            <div className="snapshot-notice">
+              <span>
+                Viewing historical snapshot · {formatDate(selected.createdAt)}
+              </span>
+              <button className="secondary" onClick={() => setSelected(latest)}>
+                Back to latest
+              </button>
+            </div>
+          )}
           <section className="stats" aria-label="Parking statistics">
             <Stat
-              label="TOTAL SPACES"
-              value={lot?.spaces.length ?? '—'}
-              icon={<CircleParking size={20} />}
-              note="Configured parking capacity"
-            />
-            <Stat
-              label="OCCUPIED"
-              value={latest?.occupiedSpaces ?? '—'}
+              label="VEHICLES DETECTED"
+              value={
+                selected?.mode === 'vehicle-detection'
+                  ? (selected.vehicleCount ?? '—')
+                  : '—'
+              }
               icon={<CarFront size={20} />}
-              note="Spaces currently in use"
-            />
-            <Stat
-              label="AVAILABLE"
-              value={latest?.availableSpaces ?? '—'}
-              icon={<ArrowUpRight size={20} />}
-              note="Spaces ready for arrivals"
+              note={
+                selected?.mode === 'legacy-demo'
+                  ? 'Legacy demo · upload a new image'
+                  : 'Visible vehicles in this snapshot'
+              }
               accent
             />
             <Stat
+              label="PARKING CAPACITY"
+              value="Unknown"
+              icon={<CircleParking size={20} />}
+              note="Parking spaces have not been detected"
+            />
+            <Stat
+              label="AVAILABLE SPACES"
+              value="Unknown"
+              icon={<ArrowUpRight size={20} />}
+              note="Vehicle count does not measure availability"
+            />
+            <Stat
               label="OCCUPANCY"
-              value={latest ? `${latest.occupancyPercentage}%` : '—'}
+              value="Unknown"
               icon={<Activity size={20} />}
-              note={
-                latest
-                  ? 'From the latest snapshot'
-                  : 'Upload an image to get started'
-              }
+              note="Requires identified parking spaces"
             />
           </section>
           <div className="analysis-grid" id="analysis">
@@ -220,11 +238,13 @@ export default function App() {
               disabled={loading || !lot}
               onAnalyze={analyze}
             />
-            <ParkingMap lot={lot} analysis={latest} />
+            <DetectionPanel key={selected?.id ?? 'empty'} analysis={selected} />
           </div>
           <AnalysisHistory
             history={history}
             busy={busy}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelected}
             onPage={(page) => void changePage(page)}
           />
           <footer>
@@ -232,7 +252,7 @@ export default function App() {
               SmartParking <span className="footer-dot">·</span> Making room for
               better decisions.
             </span>
-            <span>Demo occupancy · Snapshot history</span>
+            <span>Vehicle detection · Snapshot history</span>
           </footer>
         </main>
       </div>
@@ -258,7 +278,11 @@ function Stat({
         {label}
         <span>{icon}</span>
       </div>
-      <div className="stat-value">{value}</div>
+      <div
+        className={`stat-value ${value === 'Unknown' ? 'stat-unknown' : ''}`}
+      >
+        {value}
+      </div>
       <p>{note}</p>
     </article>
   );

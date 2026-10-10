@@ -33,6 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 export const api = {
+  assetUrl: (path: string) => `${base}${path}`,
   lots: () => request<ParkingLot[]>('/parking-lots'),
   history: (lotId: string, page = 1) =>
     request<History>(

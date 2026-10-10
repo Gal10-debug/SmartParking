@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Clock3 } from 'lucide-react';
-import type { History } from '../types';
+import type { Analysis, History } from '../types';
 export const formatDate = (value: string) =>
   new Intl.DateTimeFormat(undefined, {
     month: 'short',
@@ -10,10 +10,14 @@ export const formatDate = (value: string) =>
 export function AnalysisHistory({
   history,
   onPage,
+  onSelect,
+  selectedId,
   busy,
 }: {
   history: History | null;
   onPage: (page: number) => void;
+  onSelect: (analysis: Analysis) => void;
+  selectedId: string | null;
   busy: boolean;
 }) {
   return (
@@ -33,10 +37,9 @@ export function AnalysisHistory({
                 <tr>
                   <th>ANALYZED AT</th>
                   <th>IMAGE</th>
-                  <th>SPACES</th>
-                  <th>OCCUPIED</th>
-                  <th>AVAILABLE</th>
-                  <th>OCCUPANCY</th>
+                  <th>VEHICLES</th>
+                  <th>ANALYSIS TYPE</th>
+                  <th>RESULT</th>
                 </tr>
               </thead>
               <tbody>
@@ -49,20 +52,27 @@ export function AnalysisHistory({
                     <td className="image-cell" title={run.imageName}>
                       {run.imageName}
                     </td>
-                    <td>{run.totalSpaces}</td>
-                    <td>{run.occupiedSpaces}</td>
                     <td>
-                      <span className="available-number">
-                        {run.availableSpaces}
+                      {run.mode === 'vehicle-detection'
+                        ? run.vehicleCount
+                        : 'Unknown'}
+                    </td>
+                    <td>
+                      <span className="pill">
+                        {run.mode === 'vehicle-detection'
+                          ? 'Vehicle detection'
+                          : 'Legacy demo'}
                       </span>
                     </td>
                     <td>
-                      <div className="table-occupancy">
-                        <span>{run.occupancyPercentage}%</span>
-                        <div>
-                          <i style={{ width: `${run.occupancyPercentage}%` }} />
-                        </div>
-                      </div>
+                      <button
+                        className="secondary"
+                        disabled={busy || run.mode !== 'vehicle-detection'}
+                        onClick={() => onSelect(run)}
+                        aria-label={`View detection ${run.imageName}`}
+                      >
+                        {selectedId === run.id ? 'Viewing' : 'View image'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -101,7 +111,7 @@ export function AnalysisHistory({
           <Clock3 size={24} />
           <strong>Your first snapshot starts here</strong>
           <p className="muted">
-            Analyze an image to build your parking-lot history.
+            Analyze an image to build your vehicle-detection history.
           </p>
         </div>
       )}
