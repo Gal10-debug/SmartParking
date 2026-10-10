@@ -81,7 +81,8 @@ def main():
         upload(base, path, b"not an image", "invalid.png", "image/png")
         raise AssertionError("Invalid image accepted")
     except urllib.error.HTTPError as exc:
-        assert exc.code == 400
+        detail = exc.read().decode("utf-8", errors="replace")
+        assert exc.code == 400, f"Invalid image must return 400, got {exc.code}: {detail}"
     _, after, _ = request(base, path)
     assert after["total"] == history["total"], "Failed analysis persisted"
     print("PASS: real YOLO detection, blank-image zero, unknown occupancy, archived images, persisted JSON/history, invalid-image rejection")

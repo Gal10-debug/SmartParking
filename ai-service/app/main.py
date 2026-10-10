@@ -35,6 +35,10 @@ def get_analyzer() -> VehicleAnalyzer:
 
 
 def decode_image(data: bytes) -> Image.Image:
+    # Reject unrelated bytes before Pillow probes every installed image plugin.
+    # Plugin availability differs between local machines and slim containers.
+    if not (data.startswith(b"\x89PNG\r\n\x1a\n") or data.startswith(b"\xff\xd8\xff")):
+        raise HTTPException(400, "Upload a valid JPEG or PNG under 16 megapixels.")
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)

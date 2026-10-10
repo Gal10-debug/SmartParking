@@ -47,6 +47,18 @@ def test_invalid_image_bytes_are_rejected(client):
     assert analyze(client, b"not an image").status_code == 400
 
 
+def test_invalid_signature_is_rejected_without_probing_image_plugins(client, monkeypatch):
+    def unexpected_open(*args, **kwargs):
+        raise AssertionError("Invalid bytes must not enter plugin discovery")
+    monkeypatch.setattr(Image, "open", unexpected_open)
+    assert analyze(client, b"not an image").status_code == 400
+
+
+@pytest.mark.parametrize("data", [b"\x89PNG\r\n\x1a\ninvalid", b"\xff\xd8\xffinvalid"])
+def test_valid_signature_does_not_make_corrupt_data_valid(client, data):
+    assert analyze(client, data).status_code == 400
+
+
 def test_empty_and_large_images_are_rejected(client):
     assert analyze(client, b"").status_code == 400
     assert analyze(client, b"x" * (MAX_IMAGE_BYTES + 1)).status_code == 400
