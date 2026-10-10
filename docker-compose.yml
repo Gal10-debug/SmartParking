@@ -20,7 +20,8 @@ services:
       dockerfile: ai-service/Dockerfile
     environment:
       PORT: 8000
-      YOLO_MODEL_PATH: /models/yolo11n.pt
+      YOLO_MODEL_PROFILE: aerial
+      YOLO_MODEL_PATH: /models/visdrone-yolov8s.pt
       YOLO_DEVICE: cpu
       YOLO_CONFIDENCE: ${YOLO_CONFIDENCE:-0.35}
       YOLO_IMAGE_SIZE: ${YOLO_IMAGE_SIZE:-960}

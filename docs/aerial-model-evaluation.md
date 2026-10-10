@@ -1,8 +1,8 @@
 # Aerial vehicle model comparison
 
-Evaluated on 2026-10-08 using the three user-supplied parking images. The running
-API still uses YOLO11n COCO; this branch adds an offline comparison, not an API
-model replacement.
+Evaluated on 2026-10-08 using the three user-supplied parking images. At the time of this
+comparison the API used YOLO11n COCO. The later integration described in the root
+README selects the aerial model for new uploads and retains the COCO option.
 
 | Sample | Description | YOLO11n COCO | VisDrone YOLOv8s |
 | --- | --- | ---: | ---: |
@@ -23,7 +23,7 @@ detections, class-agnostic NMS and IoU 0.5. Class-agnostic NMS reduces overlappi
 car/van duplicates from the aerial model (44 to 39 on sample 2).
 Vehicle IDs are selected from checkpoint class names because VisDrone and COCO
 assign different numerical IDs. Vans count as vehicles in this evaluation.
-Production integration must decide how to represent vans in the existing API.
+The integration maps vans into the existing API car category.
 
 The candidate is published by
 [dronefreak/visdrone-yolov8s](https://huggingface.co/dronefreak/visdrone-yolov8s),
@@ -59,13 +59,15 @@ ignored by Git; they are not added to public CI fixtures.
 
 ## Decision and next integration work
 
-The candidate is a promising upgrade for the supplied overhead images. Before
-making it the application default, integrate a configurable, pinned model
-profile with correct vehicle-class mapping; preserve model provenance in saved
-analyses; test through the HTTP API; and expand evaluation to more independent
-parking photographs. Keep the COCO profile available for comparison and rollback.
+The candidate is a promising upgrade for the supplied overhead images. The
+subsequent integration made it the application default with a configurable, pinned model
+profile and correct vehicle-class mapping, saved model provenance, and HTTP API
+checks. More independent parking photographs are still needed. The COCO profile
+remains available for comparison and rollback.
 Parking-space capacity, occupied spaces, and availability remain unmeasured.
 
-Validation: 14 Python tests passed, including real COCO inference, dataset class
+Validation at evaluation time: 14 Python tests passed, including real COCO inference, dataset class
 mapping, and checksum rejection. The evaluation CLI ran both real checkpoints
-on all three inputs successfully. No frontend or backend behavior changed.
+on all three inputs successfully. The evaluation itself did not change frontend or backend behavior. The later
+integration passed 16 Python tests per model profile, 16 client tests, 30 .NET
+tests, and live uploads of all three samples with exact persisted JSON round trips.

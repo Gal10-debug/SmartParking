@@ -16,6 +16,7 @@ export function DetectionPanel({ analysis }: { analysis: Analysis | null }) {
   const [imageReady, setImageReady] = useState(false);
   const [imageError, setImageError] = useState(false);
   const real = analysis?.mode === 'vehicle-detection';
+  const aerial = real && analysis.analyzer.startsWith('yolov8s-visdrone-');
   const detections = real ? analysis.detections : [];
   return (
     <section className="panel detection-panel">
@@ -23,6 +24,13 @@ export function DetectionPanel({ analysis }: { analysis: Analysis | null }) {
         <div>
           <span className="eyebrow">VEHICLE DETECTION</span>
           <h2>See what the model found</h2>
+          {real && (
+            <p className="muted">
+              {aerial
+                ? 'Aerial vehicle model · Cars includes vans'
+                : 'General vehicle model'}
+            </p>
+          )}
         </div>
         {real && (
           <button
