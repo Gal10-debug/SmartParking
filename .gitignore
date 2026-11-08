@@ -24,4 +24,5 @@
 **/.ultralytics/
 *.pt
 **/.evaluation/
+**/.training/
 **/bin\\*/
